@@ -148,7 +148,7 @@ class AICodingTutor:
 
         query = user_query.lower().strip()
 
-        # Allow follow-up replies
+        # Allow conversational follow-ups
         if query in FOLLOW_UP_WORDS:
             return True
 
@@ -173,7 +173,7 @@ class AICodingTutor:
                 "data science, cloud, or programming-related question."
             )
 
-        # Build history
+        # Build chat history
         chat_messages = [
             {
                 "role": "system",
@@ -187,7 +187,7 @@ class AICodingTutor:
                 "content": msg["content"]
             })
 
-        # Generate response
+        # OpenAI response
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=chat_messages,
@@ -205,7 +205,7 @@ def generate_audio_summary(text):
     Summarize this explanation into
     3 concise learning points.
 
-    Keep it short and easy to understand.
+    Keep it short and beginner-friendly.
 
     Text:
     {text}
@@ -218,7 +218,8 @@ def generate_audio_summary(text):
                 "role": "user",
                 "content": summary_prompt
             }
-        ]
+        ],
+        temperature=0.3
     )
 
     summary = summary_response.choices[0].message.content
@@ -302,30 +303,31 @@ if uploaded_file is not None:
 
     st.code(file_content[:2000])
 
-# ---------------- CHAT HISTORY ---------------- #
+# ---------------- DISPLAY CHAT HISTORY ---------------- #
 
 for msg in st.session_state.messages:
 
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------- MULTI-LINE INPUT ---------------- #
+# ---------------- USER INPUT FORM ---------------- #
 
-st.markdown("### 💬 Ask Your Question")
+with st.form("chat_form", clear_on_submit=True):
 
-user_input = st.text_area(
-    "Enter your coding or technical question:",
-    height=150,
-    placeholder="""
+    st.markdown("### 💬 Ask Your Question")
+
+    user_input = st.text_area(
+        "Enter your coding or technical question:",
+        height=150,
+        placeholder="""
 Example:
 - Explain outlier detection using Python
 - Help debug this Spring Boot error
 - Explain CI/CD pipeline
 """
-)
+    )
 
-# Submit button
-submit = st.button("🚀 Ask Tutor")
+    submit = st.form_submit_button("🚀 Ask Tutor")
 
 # ---------------- PROCESS REQUEST ---------------- #
 
@@ -333,7 +335,7 @@ if submit and user_input:
 
     final_input = user_input
 
-    # Append uploaded file content if present
+    # Append uploaded file content
     if file_content:
 
         final_input += f"""
@@ -386,5 +388,7 @@ Uploaded File Content:
         st.markdown(summary)
 
         if audio_file:
+
             audio_bytes = open(audio_file, "rb").read()
+
             st.audio(audio_bytes, format="audio/mp3")
