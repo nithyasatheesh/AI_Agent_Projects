@@ -222,7 +222,7 @@ def visualize_dataset(df, user_query):
 
             st.pyplot(fig)
 
-    # Outlier visualization
+    # Outlier detection
     elif "outlier" in query or "iqr" in query:
 
         numeric_cols = df.select_dtypes(
@@ -241,7 +241,7 @@ def visualize_dataset(df, user_query):
 
             st.pyplot(fig)
 
-    # Generic dataframe preview
+    # Generic preview
     else:
 
         st.dataframe(df.head())
@@ -264,7 +264,7 @@ st.markdown("""
 - Dataset analysis
 - Visualization generation
 - Audio learning summaries
-- File upload support
+- Per-chat file upload support
 """)
 
 # ---------------- INIT ---------------- #
@@ -274,73 +274,79 @@ tutor = AICodingTutor()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "df" not in st.session_state:
-    st.session_state.df = None
-
-# ---------------- FILE UPLOAD ---------------- #
-
-uploaded_file = st.file_uploader(
-    "📂 Upload Dataset or Code File",
-    type=["csv", "txt", "py", "java"]
-)
-
-file_content = ""
-
-if uploaded_file is not None:
-
-    file_name = uploaded_file.name
-
-    # CSV dataset
-    if file_name.endswith(".csv"):
-
-        df = pd.read_csv(uploaded_file)
-
-        st.session_state.df = df
-
-        st.success("Dataset uploaded successfully!")
-
-        st.markdown("### 📄 Dataset Preview")
-
-        st.dataframe(df.head())
-
-    # Text/code file
-    else:
-
-        file_content = uploaded_file.read().decode("utf-8")
-
-        st.markdown("### 📄 File Preview")
-
-        st.code(file_content[:2000])
-
-# ---------------- CHAT HISTORY ---------------- #
+# ---------------- DISPLAY CHAT HISTORY ---------------- #
 
 for msg in st.session_state.messages:
 
     with st.chat_message(msg["role"]):
+
         st.markdown(msg["content"])
+
+        # Show dataset preview if available
+        if "dataset_preview" in msg:
+
+            st.markdown("### 📄 Dataset Preview")
+
+            st.dataframe(msg["dataset_preview"])
 
 # ---------------- PROCESS REQUEST ---------------- #
 
 if "pending_input" in st.session_state:
 
-    user_input = st.session_state.pending_input
+    pending = st.session_state.pending_input
+
+    user_input = pending["question"]
+
+    uploaded_file = pending["file"]
 
     final_input = user_input
 
-    # Attach code/text file content
-    if file_content:
+    df = None
 
-        final_input += f"""
+    file_preview = None
+
+    # Handle uploaded file
+    if uploaded_file is not None:
+
+        file_name = uploaded_file.name
+
+        # CSV dataset
+        if file_name.endswith(".csv"):
+
+            df = pd.read_csv(uploaded_file)
+
+            file_preview = df.head()
+
+            final_input += f"""
+
+Dataset Columns:
+{list(df.columns)}
+
+Dataset Sample:
+{df.head().to_string()}
+"""
+
+        # Code/text file
+        else:
+
+            file_content = uploaded_file.read().decode("utf-8")
+
+            final_input += f"""
 
 Uploaded File Content:
 {file_content}
 """
 
     # Save user message
-    st.session_state.messages.append({
+    user_message = {
         "role": "user",
         "content": user_input
-    })
+    }
+
+    if file_preview is not None:
+        user_message["dataset_preview"] = file_preview
+
+    st.session_state.messages.append(user_message)
 
     # Generate AI response
     answer = tutor.get_response(
@@ -348,35 +354,46 @@ Uploaded File Content:
     )
 
     # Save assistant response
-    st.session_state.messages.append({
+    assistant_message = {
         "role": "assistant",
         "content": answer
-    })
+    }
+
+    st.session_state.messages.append(
+        assistant_message
+    )
+
+    # Save visualization state
+    st.session_state.current_df = df
+    st.session_state.current_query = user_input
 
     # Clear pending state
     del st.session_state.pending_input
 
     st.rerun()
 
-# ---------------- SHOW LATEST FEATURES ---------------- #
+# ---------------- LATEST RESPONSE FEATURES ---------------- #
 
 if st.session_state.messages:
 
-    latest_msg = st.session_state.messages[-1]
+    latest_message = st.session_state.messages[-1]
 
-    if latest_msg["role"] == "assistant":
+    if latest_message["role"] == "assistant":
 
-        latest_answer = latest_msg["content"]
+        latest_answer = latest_message["content"]
 
-        # DATASET VISUALIZATION
-        if st.session_state.df is not None:
+        # Dataset visualization
+        if (
+            "current_df" in st.session_state
+            and st.session_state.current_df is not None
+        ):
 
             visualize_dataset(
-                st.session_state.df,
-                latest_answer
+                st.session_state.current_df,
+                st.session_state.current_query
             )
 
-        # AUDIO SUMMARY
+        # Audio summary
         st.markdown("### 🔊 Audio Learning Summary")
 
         audio_file, summary = generate_audio_summary(
@@ -387,7 +404,10 @@ if st.session_state.messages:
 
         if audio_file:
 
-            audio_bytes = open(audio_file, "rb").read()
+            audio_bytes = open(
+                audio_file,
+                "rb"
+            ).read()
 
             st.audio(
                 audio_bytes,
@@ -412,10 +432,21 @@ Examples:
 """
     )
 
-    submit = st.form_submit_button("🚀 Ask Assistant")
+    uploaded_file = st.file_uploader(
+        "📂 Attach dataset or code file (optional)",
+        type=["csv", "txt", "py", "java"],
+        key="chat_file"
+    )
+
+    submit = st.form_submit_button(
+        "🚀 Ask Assistant"
+    )
 
     if submit and user_input:
 
-        st.session_state.pending_input = user_input
+        st.session_state.pending_input = {
+            "question": user_input,
+            "file": uploaded_file
+        }
 
         st.rerun()
