@@ -76,6 +76,8 @@ ALLOWED_TOPICS = [
     "clustering",
     "dataset",
     "statistics",
+    "iqr",
+    "quartile",
 
     # Cloud
     "aws",
@@ -118,6 +120,13 @@ class AICodingTutor:
         - Encourage users to learn through explanations
         - Ask guided follow-up questions when appropriate
         - Maintain conversational context
+
+        Formatting Rules:
+        - Use clean markdown formatting
+        - Avoid raw LaTeX or mathematical markup
+        - Prefer readable plain-text formulas
+        - Use bullet points and numbered steps
+        - Keep explanations visually clean
 
         STRICT RESTRICTIONS:
         - ONLY answer software engineering, programming,
@@ -199,7 +208,7 @@ def generate_audio_summary(text):
     Summarize this technical explanation into
     3-5 concise learning points for audio narration.
 
-    Keep the response short and easy to understand.
+    Keep it short, clean, and beginner-friendly.
 
     Text:
     {text}
@@ -218,6 +227,7 @@ def generate_audio_summary(text):
 
     summary = summary_response.choices[0].message.content
 
+    # Generate audio
     tts = gTTS(summary)
 
     temp_audio = tempfile.NamedTemporaryFile(
@@ -286,7 +296,7 @@ tutor = AICodingTutor()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display old messages
+# Display previous chat
 for msg in st.session_state.messages:
 
     with st.chat_message(msg["role"]):
@@ -305,7 +315,7 @@ if user_input:
         "content": user_input
     })
 
-    # Display user message
+    # Show user message
     with st.chat_message("user"):
         st.markdown(user_input)
 
@@ -325,11 +335,15 @@ if user_input:
 
         st.markdown(answer)
 
-        # Visualization for outliers
-        if "outlier" in user_input.lower():
+        # Visualization for outlier-related queries
+        if (
+            "outlier" in user_input.lower()
+            or "iqr" in user_input.lower()
+        ):
+            st.markdown("### 📊 Visualization")
             show_outlier_visualization()
 
-        # Audio summary button
+        # Audio learning summary
         if st.button("🔊 Play Key Learning Points"):
 
             audio_file, summary = generate_audio_summary(answer)
