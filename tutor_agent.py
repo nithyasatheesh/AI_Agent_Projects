@@ -1,12 +1,18 @@
 # app.py
 
+import tempfile
+
+import matplotlib.pyplot as plt
 import streamlit as st
+from gtts import gTTS
 from openai import OpenAI
 
-# OpenAI client
+# ---------------- OPENAI CLIENT ---------------- #
+
 client = OpenAI()
 
-# Allowed technical keywords
+# ---------------- CONFIG ---------------- #
+
 ALLOWED_TOPICS = [
 
     # Programming
@@ -77,6 +83,21 @@ ALLOWED_TOPICS = [
     "gcp"
 ]
 
+FOLLOW_UP_WORDS = [
+    "yes",
+    "no",
+    "continue",
+    "show example",
+    "example",
+    "proceed",
+    "explain more",
+    "show in python",
+    "show in java",
+    "show code"
+]
+
+# ---------------- AI TUTOR ---------------- #
+
 class AICodingTutor:
 
     def __init__(self):
@@ -92,51 +113,136 @@ class AICodingTutor:
         - Guide users step-by-step
         - Encourage learning instead of directly giving full solutions
 
-        Restrictions:
-        - ONLY answer software engineering and technical questions
+        Behavior Rules:
+        - Be concise, professional, and technical
+        - Encourage users to learn through explanations
+        - Ask guided follow-up questions when appropriate
+        - Maintain conversational context
+
+        STRICT RESTRICTIONS:
+        - ONLY answer software engineering, programming,
+          debugging, testing, DevOps, cloud, data science,
+          AI/ML, and technical questions
         - Reject generic/non-technical questions
-        - Do not answer weather, politics, sports, movies,
-          personal advice, or casual chat
+
+        DO NOT answer:
+        - Weather
+        - Politics
+        - Sports
+        - Movies
+        - Health advice
+        - Casual conversation
+        - General non-technical topics
+
+        If a question is unrelated, respond with:
+        "I am an AI Coding Tutor specialized only in software engineering and technical topics."
         """
 
-    def is_technical_question(self, user_query: str) -> bool:
+    def is_technical_question(self, user_query: str):
 
-        query = user_query.lower()
+        query = user_query.lower().strip()
 
+        # Allow follow-up replies
+        if query in FOLLOW_UP_WORDS:
+            return True
+
+        # Allow technical keywords
         for keyword in ALLOWED_TOPICS:
             if keyword in query:
                 return True
 
         return False
 
-    def get_response(self, user_query: str):
+    def get_response(self, messages):
+
+        latest_user_message = messages[-1]["content"]
 
         # Reject non-technical questions
-        if not self.is_technical_question(user_query):
+        if not self.is_technical_question(latest_user_message):
 
             return (
                 "I am an AI Coding Tutor specialized only in "
-                "software engineering and programming-related questions.\n\n"
-                "Please ask a coding, debugging, testing, or technical question."
+                "software engineering and technical topics.\n\n"
+                "Please ask a coding, debugging, testing, "
+                "data science, cloud, or programming-related question."
             )
+
+        # Build conversation history
+        chat_messages = [
+            {
+                "role": "system",
+                "content": self.system_prompt
+            }
+        ]
+
+        for msg in messages:
+            chat_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
 
         # OpenAI response
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": self.system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": user_query
-                }
-            ],
+            messages=chat_messages,
             temperature=0.3
         )
 
         return response.choices[0].message.content
+
+
+# ---------------- AUDIO SUMMARY ---------------- #
+
+def generate_audio_summary(text):
+
+    summary_prompt = f"""
+    Summarize this technical explanation into
+    3-5 concise learning points for audio narration.
+
+    Keep the response short and easy to understand.
+
+    Text:
+    {text}
+    """
+
+    summary_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": summary_prompt
+            }
+        ],
+        temperature=0.3
+    )
+
+    summary = summary_response.choices[0].message.content
+
+    tts = gTTS(summary)
+
+    temp_audio = tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".mp3"
+    )
+
+    tts.save(temp_audio.name)
+
+    return temp_audio.name, summary
+
+
+# ---------------- VISUALIZATION ---------------- #
+
+def show_outlier_visualization():
+
+    data = [10, 12, 13, 14, 15, 16, 18, 20, 100]
+
+    fig, ax = plt.subplots()
+
+    ax.boxplot(data)
+
+    ax.set_title("Outlier Detection Example")
+
+    st.pyplot(fig)
 
 
 # ---------------- STREAMLIT UI ---------------- #
@@ -153,12 +259,20 @@ st.markdown("""
 Enterprise onboarding and coding assistant.
 
 ### Supported Areas
-- Programming concepts
-- Debugging support
-- Unit testing
-- APIs & backend development
+- Programming
+- Debugging
+- Unit Testing
+- APIs & Backend
 - Spring Boot / Python / SQL
-- CI/CD & DevOps basics
+- CI/CD & DevOps
+- Data Science & Machine Learning
+- Cloud Concepts
+
+### Features
+- Technical Q&A
+- Guided learning
+- Audio learning summaries
+- Visual explanations
 
 ### Restrictions
 - No weather/news/general questions
@@ -178,30 +292,49 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Chat input
-user_input = st.chat_input("Ask a coding or technical question...")
+# User input
+user_input = st.chat_input(
+    "Ask a coding or technical question..."
+)
 
 if user_input:
 
-    # Store user message
+    # Save user message
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
     })
 
-    # Show user message
+    # Display user message
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Generate response
-    answer = tutor.get_response(user_input)
+    # Get AI response
+    answer = tutor.get_response(
+        st.session_state.messages
+    )
 
-    # Store assistant response
+    # Save assistant response
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer
     })
 
-    # Show assistant response
+    # Display assistant response
     with st.chat_message("assistant"):
+
         st.markdown(answer)
+
+        # Visualization for outliers
+        if "outlier" in user_input.lower():
+            show_outlier_visualization()
+
+        # Audio summary button
+        if st.button("🔊 Play Key Learning Points"):
+
+            audio_file, summary = generate_audio_summary(answer)
+
+            st.markdown("### 🎯 Key Learning Points")
+            st.markdown(summary)
+
+            st.audio(audio_file)
