@@ -1,9 +1,10 @@
 # app.py
 
 import tempfile
-
+import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
+
 from gtts import gTTS
 from openai import OpenAI
 
@@ -16,73 +17,30 @@ client = OpenAI()
 ALLOWED_TOPICS = [
 
     # Programming
-    "python",
-    "java",
-    "javascript",
-    "react",
-    "spring boot",
-    "fastapi",
-    "flask",
-    "api",
-    "backend",
-    "frontend",
-    "programming",
-    "code",
+    "python", "java", "javascript", "react",
+    "spring boot", "fastapi", "flask",
+    "api", "backend", "frontend",
+    "programming", "code",
 
-    # Testing & Debugging
-    "unit test",
-    "testing",
-    "debug",
-    "bug",
-    "exception",
-    "compile",
+    # Debugging & Testing
+    "unit test", "testing", "debug",
+    "bug", "exception", "compile",
 
-    # Databases
-    "sql",
-    "database",
-    "mysql",
-    "postgresql",
+    # Database
+    "sql", "database", "mysql", "postgresql",
 
     # DevOps
-    "docker",
-    "kubernetes",
-    "ci/cd",
-    "jenkins",
-    "git",
-    "github",
+    "docker", "kubernetes", "ci/cd",
+    "jenkins", "git", "github",
 
-    # CS Concepts
-    "algorithm",
-    "data structure",
-    "oop",
-    "object oriented",
-
-    # Data Science / AI
-    "machine learning",
-    "deep learning",
-    "data science",
-    "data analysis",
-    "pandas",
-    "numpy",
-    "outlier",
-    "outliers",
-    "missing value",
-    "missing values",
-    "normalization",
-    "standardization",
-    "feature engineering",
-    "classification",
-    "regression",
-    "clustering",
-    "dataset",
-    "statistics",
-    "iqr",
-    "quartile",
-
-    # Cloud
-    "aws",
-    "azure",
-    "gcp"
+    # Data Science
+    "data science", "machine learning",
+    "outlier", "outliers",
+    "missing value", "missing values",
+    "dataset", "visualize", "plot",
+    "graph", "chart", "correlation",
+    "distribution", "statistics",
+    "pandas", "numpy", "iqr"
 ]
 
 FOLLOW_UP_WORDS = [
@@ -90,12 +48,9 @@ FOLLOW_UP_WORDS = [
     "no",
     "continue",
     "show example",
-    "example",
-    "proceed",
-    "explain more",
     "show in python",
-    "show in java",
-    "show code"
+    "show code",
+    "visualize it"
 ]
 
 # ---------------- AI TUTOR ---------------- #
@@ -105,45 +60,33 @@ class AICodingTutor:
     def __init__(self):
 
         self.system_prompt = """
-        You are an AI Coding Tutor designed for enterprise onboarding
-        and software engineering bootcamps.
+        You are an AI Technical Learning Assistant.
 
         Responsibilities:
-        - Help users solve coding problems
-        - Explain technical concepts
-        - Debug errors
+        - Explain coding concepts
+        - Help debug errors
         - Guide users step-by-step
-        - Encourage learning instead of directly giving full solutions
-
-        Behavior Rules:
-        - Be concise, professional, and technical
-        - Encourage users to learn through explanations
-        - Ask guided follow-up questions when appropriate
-        - Maintain conversational context
+        - Explain datasets and visualizations
+        - Help with software engineering and data science
 
         Formatting Rules:
-        - Use clean markdown formatting
-        - Avoid raw LaTeX or mathematical markup
-        - Prefer readable plain-text formulas
-        - Use bullet points and numbered steps
-        - Keep explanations visually clean
+        - Use clean markdown
+        - Avoid raw LaTeX
+        - Use numbered steps
+        - Keep responses readable
 
         STRICT RESTRICTIONS:
-        - ONLY answer software engineering, programming,
-          debugging, testing, DevOps, cloud, data science,
-          AI/ML, and technical questions
-        - Reject generic/non-technical questions
+        - ONLY answer technical questions
+        - Reject weather/news/general chat
         """
 
-    def is_technical_question(self, user_query: str):
+    def is_technical_question(self, query):
 
-        query = user_query.lower().strip()
+        query = query.lower().strip()
 
-        # Allow conversational follow-ups
         if query in FOLLOW_UP_WORDS:
             return True
 
-        # Check technical keywords
         for keyword in ALLOWED_TOPICS:
             if keyword in query:
                 return True
@@ -152,19 +95,16 @@ class AICodingTutor:
 
     def get_response(self, messages):
 
-        latest_user_message = messages[-1]["content"]
+        latest_message = messages[-1]["content"]
 
-        # Reject non-technical questions
-        if not self.is_technical_question(latest_user_message):
+        if not self.is_technical_question(latest_message):
 
             return (
-                "I am an AI Coding Tutor specialized only in "
-                "software engineering and technical topics.\n\n"
-                "Please ask a coding, debugging, testing, "
-                "data science, cloud, or programming-related question."
+                "I am an AI Technical Learning Assistant "
+                "specialized only in coding, software engineering, "
+                "data science, and technical topics."
             )
 
-        # Build chat history
         chat_messages = [
             {
                 "role": "system",
@@ -178,7 +118,6 @@ class AICodingTutor:
                 "content": msg["content"]
             })
 
-        # OpenAI response
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=chat_messages,
@@ -193,10 +132,7 @@ class AICodingTutor:
 def generate_audio_summary(text):
 
     summary_prompt = f"""
-    Summarize this explanation into
-    3 concise learning points.
-
-    Keep it short and beginner-friendly.
+    Summarize this into 3 concise learning points.
 
     Text:
     {text}
@@ -209,15 +145,14 @@ def generate_audio_summary(text):
                 "role": "user",
                 "content": summary_prompt
             }
-        ],
-        temperature=0.3
+        ]
     )
 
     summary = summary_response.choices[0].message.content
 
     try:
 
-        tts = gTTS(text=summary, lang="en")
+        tts = gTTS(summary)
 
         temp_audio = tempfile.NamedTemporaryFile(
             delete=False,
@@ -230,71 +165,154 @@ def generate_audio_summary(text):
 
     except Exception as e:
 
-        return None, f"Audio generation failed: {str(e)}"
+        return None, str(e)
 
 
 # ---------------- VISUALIZATION ---------------- #
 
-def show_outlier_visualization():
+def visualize_dataset(df, user_query):
 
-    data = [10, 12, 13, 14, 15, 16, 18, 20, 100]
+    query = user_query.lower()
 
-    fig, ax = plt.subplots()
+    st.markdown("### 📊 Dataset Visualization")
 
-    ax.boxplot(data)
+    # Missing values
+    if "missing" in query:
 
-    ax.set_title("Outlier Detection Example")
+        missing = df.isnull().sum()
 
-    st.pyplot(fig)
+        fig, ax = plt.subplots()
+
+        missing.plot(
+            kind="bar",
+            ax=ax
+        )
+
+        ax.set_title("Missing Values")
+
+        st.pyplot(fig)
+
+    # Correlation
+    elif "correlation" in query:
+
+        corr = df.corr(numeric_only=True)
+
+        st.dataframe(corr)
+
+    # Distribution
+    elif "distribution" in query:
+
+        numeric_cols = df.select_dtypes(
+            include="number"
+        ).columns
+
+        if len(numeric_cols) > 0:
+
+            col = numeric_cols[0]
+
+            fig, ax = plt.subplots()
+
+            df[col].plot(
+                kind="hist",
+                bins=20,
+                ax=ax
+            )
+
+            ax.set_title(f"Distribution of {col}")
+
+            st.pyplot(fig)
+
+    # Outlier visualization
+    elif "outlier" in query or "iqr" in query:
+
+        numeric_cols = df.select_dtypes(
+            include="number"
+        ).columns
+
+        if len(numeric_cols) > 0:
+
+            col = numeric_cols[0]
+
+            fig, ax = plt.subplots()
+
+            ax.boxplot(df[col].dropna())
+
+            ax.set_title(f"Outlier Detection - {col}")
+
+            st.pyplot(fig)
+
+    # Generic dataframe preview
+    else:
+
+        st.dataframe(df.head())
 
 
 # ---------------- STREAMLIT UI ---------------- #
 
 st.set_page_config(
-    page_title="AI Coding Tutor",
+    page_title="AI Technical Learning Assistant",
     page_icon="💻",
     layout="wide"
 )
 
-st.title("💻 AI Coding Tutor")
+st.title("💻 AI Technical Learning Assistant")
 
 st.markdown("""
-Enterprise onboarding and coding assistant.
-
 ### Features
-- Technical Q&A
-- Guided learning
+- Coding help
+- Debugging support
+- Dataset analysis
+- Visualization generation
 - Audio learning summaries
-- Visualization support
 - File upload support
-- Multi-line coding questions
 """)
 
-# Initialize tutor
+# ---------------- INIT ---------------- #
+
 tutor = AICodingTutor()
 
-# Session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "df" not in st.session_state:
+    st.session_state.df = None
 
 # ---------------- FILE UPLOAD ---------------- #
 
 uploaded_file = st.file_uploader(
-    "📂 Upload a technical document or code file",
-    type=["txt", "py", "java", "md"]
+    "📂 Upload Dataset or Code File",
+    type=["csv", "txt", "py", "java"]
 )
 
 file_content = ""
 
 if uploaded_file is not None:
 
-    file_content = uploaded_file.read().decode("utf-8")
+    file_name = uploaded_file.name
 
-    st.markdown("### 📄 Uploaded File Preview")
+    # CSV dataset
+    if file_name.endswith(".csv"):
 
-    st.code(file_content[:2000])
+        df = pd.read_csv(uploaded_file)
 
-# ---------------- DISPLAY CHAT HISTORY ---------------- #
+        st.session_state.df = df
+
+        st.success("Dataset uploaded successfully!")
+
+        st.markdown("### 📄 Dataset Preview")
+
+        st.dataframe(df.head())
+
+    # Text/code file
+    else:
+
+        file_content = uploaded_file.read().decode("utf-8")
+
+        st.markdown("### 📄 File Preview")
+
+        st.code(file_content[:2000])
+
+# ---------------- CHAT HISTORY ---------------- #
 
 for msg in st.session_state.messages:
 
@@ -309,7 +327,7 @@ if "pending_input" in st.session_state:
 
     final_input = user_input
 
-    # Append uploaded file content
+    # Attach code/text file content
     if file_content:
 
         final_input += f"""
@@ -321,10 +339,10 @@ Uploaded File Content:
     # Save user message
     st.session_state.messages.append({
         "role": "user",
-        "content": final_input
+        "content": user_input
     })
 
-    # Generate answer
+    # Generate AI response
     answer = tutor.get_response(
         st.session_state.messages
     )
@@ -335,33 +353,30 @@ Uploaded File Content:
         "content": answer
     })
 
-    # Clear pending input
+    # Clear pending state
     del st.session_state.pending_input
 
-    # Rerun to refresh chat properly
     st.rerun()
 
-# ---------------- SHOW LATEST RESPONSE FEATURES ---------------- #
+# ---------------- SHOW LATEST FEATURES ---------------- #
 
 if st.session_state.messages:
 
-    latest_message = st.session_state.messages[-1]
+    latest_msg = st.session_state.messages[-1]
 
-    if latest_message["role"] == "assistant":
+    if latest_msg["role"] == "assistant":
 
-        latest_answer = latest_message["content"]
+        latest_answer = latest_msg["content"]
 
-        # Visualization
-        if (
-            "outlier" in latest_answer.lower()
-            or "iqr" in latest_answer.lower()
-        ):
+        # DATASET VISUALIZATION
+        if st.session_state.df is not None:
 
-            st.markdown("### 📊 Visualization")
+            visualize_dataset(
+                st.session_state.df,
+                latest_answer
+            )
 
-            show_outlier_visualization()
-
-        # Audio Summary
+        # AUDIO SUMMARY
         st.markdown("### 🔊 Audio Learning Summary")
 
         audio_file, summary = generate_audio_summary(
@@ -374,26 +389,30 @@ if st.session_state.messages:
 
             audio_bytes = open(audio_file, "rb").read()
 
-            st.audio(audio_bytes, format="audio/mp3")
+            st.audio(
+                audio_bytes,
+                format="audio/mp3"
+            )
 
-# ---------------- INPUT FORM AT BOTTOM ---------------- #
+# ---------------- INPUT FORM ---------------- #
 
 with st.form("chat_form", clear_on_submit=True):
 
     st.markdown("### 💬 Ask Your Question")
 
     user_input = st.text_area(
-        "Enter your coding or technical question:",
+        "Enter your coding or dataset question:",
         height=150,
         placeholder="""
-Example:
-- Explain outlier detection using Python
-- Help debug this Spring Boot error
+Examples:
+- Visualize missing values
+- Detect outliers
 - Explain CI/CD pipeline
+- Debug this Python code
 """
     )
 
-    submit = st.form_submit_button("🚀 Ask Tutor")
+    submit = st.form_submit_button("🚀 Ask Assistant")
 
     if submit and user_input:
 
