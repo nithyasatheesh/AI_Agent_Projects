@@ -8,39 +8,74 @@ client = OpenAI()
 
 # Allowed technical keywords
 ALLOWED_TOPICS = [
+
+    # Programming
     "python",
     "java",
+    "javascript",
+    "react",
     "spring boot",
+    "fastapi",
+    "flask",
     "api",
-    "json",
+    "backend",
+    "frontend",
+    "programming",
+    "code",
+
+    # Testing & Debugging
     "unit test",
     "testing",
     "debug",
     "bug",
-    "compile",
     "exception",
-    "fastapi",
-    "flask",
+    "compile",
+
+    # Databases
     "sql",
     "database",
-    "git",
-    "github",
+    "mysql",
+    "postgresql",
+
+    # DevOps
     "docker",
     "kubernetes",
     "ci/cd",
     "jenkins",
-    "microservices",
-    "rest",
-    "backend",
-    "frontend",
-    "javascript",
-    "react",
-    "code",
-    "programming",
-    "algorithm",
-    "data structure"
-]
+    "git",
+    "github",
 
+    # CS Concepts
+    "algorithm",
+    "data structure",
+    "oop",
+    "object oriented",
+
+    # Data Science / AI
+    "machine learning",
+    "deep learning",
+    "data science",
+    "data analysis",
+    "pandas",
+    "numpy",
+    "outlier",
+    "outliers",
+    "missing value",
+    "missing values",
+    "normalization",
+    "standardization",
+    "feature engineering",
+    "classification",
+    "regression",
+    "clustering",
+    "dataset",
+    "statistics",
+
+    # Cloud
+    "aws",
+    "azure",
+    "gcp"
+]
 
 class AICodingTutor:
 
