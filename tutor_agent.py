@@ -142,9 +142,6 @@ class AICodingTutor:
         - Health advice
         - Casual conversation
         - General non-technical topics
-
-        If a question is unrelated, respond with:
-        "I am an AI Coding Tutor specialized only in software engineering and technical topics."
         """
 
     def is_technical_question(self, user_query: str):
@@ -155,7 +152,7 @@ class AICodingTutor:
         if query in FOLLOW_UP_WORDS:
             return True
 
-        # Allow technical keywords
+        # Check keywords
         for keyword in ALLOWED_TOPICS:
             if keyword in query:
                 return True
@@ -176,7 +173,7 @@ class AICodingTutor:
                 "data science, cloud, or programming-related question."
             )
 
-        # Build conversation history
+        # Build history
         chat_messages = [
             {
                 "role": "system",
@@ -190,7 +187,7 @@ class AICodingTutor:
                 "content": msg["content"]
             })
 
-        # OpenAI response
+        # Generate response
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=chat_messages,
@@ -205,10 +202,10 @@ class AICodingTutor:
 def generate_audio_summary(text):
 
     summary_prompt = f"""
-    Summarize this technical explanation into
-    3-5 concise learning points for audio narration.
+    Summarize this explanation into
+    3 concise learning points.
 
-    Keep it short, clean, and beginner-friendly.
+    Keep it short and easy to understand.
 
     Text:
     {text}
@@ -221,23 +218,27 @@ def generate_audio_summary(text):
                 "role": "user",
                 "content": summary_prompt
             }
-        ],
-        temperature=0.3
+        ]
     )
 
     summary = summary_response.choices[0].message.content
 
-    # Generate audio
-    tts = gTTS(summary)
+    try:
 
-    temp_audio = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".mp3"
-    )
+        tts = gTTS(text=summary, lang="en")
 
-    tts.save(temp_audio.name)
+        temp_audio = tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".mp3"
+        )
 
-    return temp_audio.name, summary
+        tts.save(temp_audio.name)
+
+        return temp_audio.name, summary
+
+    except Exception as e:
+
+        return None, f"Audio generation failed: {str(e)}"
 
 
 # ---------------- VISUALIZATION ---------------- #
@@ -260,7 +261,7 @@ def show_outlier_visualization():
 st.set_page_config(
     page_title="AI Coding Tutor",
     page_icon="💻",
-    layout="centered"
+    layout="wide"
 )
 
 st.title("💻 AI Coding Tutor")
@@ -268,58 +269,90 @@ st.title("💻 AI Coding Tutor")
 st.markdown("""
 Enterprise onboarding and coding assistant.
 
-### Supported Areas
-- Programming
-- Debugging
-- Unit Testing
-- APIs & Backend
-- Spring Boot / Python / SQL
-- CI/CD & DevOps
-- Data Science & Machine Learning
-- Cloud Concepts
-
 ### Features
 - Technical Q&A
 - Guided learning
 - Audio learning summaries
-- Visual explanations
-
-### Restrictions
-- No weather/news/general questions
-- No casual conversation
+- Visualization support
+- File upload support
+- Multi-line coding questions
 """)
 
 # Initialize tutor
 tutor = AICodingTutor()
 
-# Chat history
+# Session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat
+# ---------------- FILE UPLOAD ---------------- #
+
+uploaded_file = st.file_uploader(
+    "📂 Upload a technical document or code file",
+    type=["txt", "py", "java", "md"]
+)
+
+file_content = ""
+
+if uploaded_file is not None:
+
+    file_content = uploaded_file.read().decode("utf-8")
+
+    st.markdown("### 📄 Uploaded File Preview")
+
+    st.code(file_content[:2000])
+
+# ---------------- CHAT HISTORY ---------------- #
+
 for msg in st.session_state.messages:
 
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
-user_input = st.chat_input(
-    "Ask a coding or technical question..."
+# ---------------- MULTI-LINE INPUT ---------------- #
+
+st.markdown("### 💬 Ask Your Question")
+
+user_input = st.text_area(
+    "Enter your coding or technical question:",
+    height=150,
+    placeholder="""
+Example:
+- Explain outlier detection using Python
+- Help debug this Spring Boot error
+- Explain CI/CD pipeline
+"""
 )
 
-if user_input:
+# Submit button
+submit = st.button("🚀 Ask Tutor")
+
+# ---------------- PROCESS REQUEST ---------------- #
+
+if submit and user_input:
+
+    final_input = user_input
+
+    # Append uploaded file content if present
+    if file_content:
+
+        final_input += f"""
+
+Uploaded File Content:
+{file_content}
+"""
 
     # Save user message
     st.session_state.messages.append({
         "role": "user",
-        "content": user_input
+        "content": final_input
     })
 
-    # Show user message
+    # Display user message
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Get AI response
+    # Generate answer
     answer = tutor.get_response(
         st.session_state.messages
     )
@@ -335,20 +368,23 @@ if user_input:
 
         st.markdown(answer)
 
-        # Visualization for outlier-related queries
+        # Visualization
         if (
             "outlier" in user_input.lower()
             or "iqr" in user_input.lower()
         ):
+
             st.markdown("### 📊 Visualization")
+
             show_outlier_visualization()
 
-        # Audio learning summary
-        if st.button("🔊 Play Key Learning Points"):
+        # Audio Summary
+        st.markdown("### 🔊 Audio Learning Summary")
 
-            audio_file, summary = generate_audio_summary(answer)
+        audio_file, summary = generate_audio_summary(answer)
 
-            st.markdown("### 🎯 Key Learning Points")
-            st.markdown(summary)
+        st.markdown(summary)
 
-            st.audio(audio_file)
+        if audio_file:
+            audio_bytes = open(audio_file, "rb").read()
+            st.audio(audio_bytes, format="audio/mp3")
