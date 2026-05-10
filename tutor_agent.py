@@ -133,15 +133,6 @@ class AICodingTutor:
           debugging, testing, DevOps, cloud, data science,
           AI/ML, and technical questions
         - Reject generic/non-technical questions
-
-        DO NOT answer:
-        - Weather
-        - Politics
-        - Sports
-        - Movies
-        - Health advice
-        - Casual conversation
-        - General non-technical topics
         """
 
     def is_technical_question(self, user_query: str):
@@ -152,7 +143,7 @@ class AICodingTutor:
         if query in FOLLOW_UP_WORDS:
             return True
 
-        # Check keywords
+        # Check technical keywords
         for keyword in ALLOWED_TOPICS:
             if keyword in query:
                 return True
@@ -310,28 +301,11 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------- USER INPUT FORM ---------------- #
-
-with st.form("chat_form", clear_on_submit=True):
-
-    st.markdown("### 💬 Ask Your Question")
-
-    user_input = st.text_area(
-        "Enter your coding or technical question:",
-        height=150,
-        placeholder="""
-Example:
-- Explain outlier detection using Python
-- Help debug this Spring Boot error
-- Explain CI/CD pipeline
-"""
-    )
-
-    submit = st.form_submit_button("🚀 Ask Tutor")
-
 # ---------------- PROCESS REQUEST ---------------- #
 
-if submit and user_input:
+if "pending_input" in st.session_state:
+
+    user_input = st.session_state.pending_input
 
     final_input = user_input
 
@@ -350,10 +324,6 @@ Uploaded File Content:
         "content": final_input
     })
 
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
     # Generate answer
     answer = tutor.get_response(
         st.session_state.messages
@@ -365,15 +335,26 @@ Uploaded File Content:
         "content": answer
     })
 
-    # Display assistant response
-    with st.chat_message("assistant"):
+    # Clear pending input
+    del st.session_state.pending_input
 
-        st.markdown(answer)
+    # Rerun to refresh chat properly
+    st.rerun()
+
+# ---------------- SHOW LATEST RESPONSE FEATURES ---------------- #
+
+if st.session_state.messages:
+
+    latest_message = st.session_state.messages[-1]
+
+    if latest_message["role"] == "assistant":
+
+        latest_answer = latest_message["content"]
 
         # Visualization
         if (
-            "outlier" in user_input.lower()
-            or "iqr" in user_input.lower()
+            "outlier" in latest_answer.lower()
+            or "iqr" in latest_answer.lower()
         ):
 
             st.markdown("### 📊 Visualization")
@@ -383,7 +364,9 @@ Uploaded File Content:
         # Audio Summary
         st.markdown("### 🔊 Audio Learning Summary")
 
-        audio_file, summary = generate_audio_summary(answer)
+        audio_file, summary = generate_audio_summary(
+            latest_answer
+        )
 
         st.markdown(summary)
 
@@ -392,3 +375,28 @@ Uploaded File Content:
             audio_bytes = open(audio_file, "rb").read()
 
             st.audio(audio_bytes, format="audio/mp3")
+
+# ---------------- INPUT FORM AT BOTTOM ---------------- #
+
+with st.form("chat_form", clear_on_submit=True):
+
+    st.markdown("### 💬 Ask Your Question")
+
+    user_input = st.text_area(
+        "Enter your coding or technical question:",
+        height=150,
+        placeholder="""
+Example:
+- Explain outlier detection using Python
+- Help debug this Spring Boot error
+- Explain CI/CD pipeline
+"""
+    )
+
+    submit = st.form_submit_button("🚀 Ask Tutor")
+
+    if submit and user_input:
+
+        st.session_state.pending_input = user_input
+
+        st.rerun()
